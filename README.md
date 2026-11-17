@@ -73,6 +73,7 @@ The install keeps them in `/etc/ssl/cloudflare/` (the key readable only by root)
 | Domain name | the server's IP | The website's name, without `www.` |
 | Cloudflare origin certificate | | With Cloudflare: the editor opens twice, for the certificate, then its private key (paste, Ctrl+O, Enter, Ctrl+X) |
 | Stratum URL | the domain name | What miners connect to |
+| Android app (Google Play) | none | If you publish the website as an Android app on Google Play (Bubblewrap): its package name, like `io.example.pool`. The website then knows when that app is installed. Empty if you have none |
 | Admin email | | Shown on the website; with Let's Encrypt, its notices go to it |
 | Your public IP | from your SSH connection | The IP of the computer you run the admin from |
 | DMD stratum port | 8700 | Miners connect to it; it is opened in the firewall |
@@ -108,6 +109,22 @@ the install user can read.
 5. **Notifications** start with the server: `systemctl is-active dmd-pool-push` says `active`.
    Their keys are `configuration/push-vapid.pem` and `configuration/push.php`: back them up. A new
    key means every device turns notifications on again, so move both with the pool.
+
+### The pool app on Google Play, later
+
+The website installs as an app from the browser. If you also publish it on Google Play (a
+Bubblewrap app), let the website know its package name, so that it does not offer the browser
+version to people who have the Play app. In `/home/crypto-data/yiimp/site/web/manifest.json`, add
+to `related_applications`:
+
+```
+{ "platform": "play", "id": "io.example.pool", "url": "https://play.google.com/store/apps/details?id=io.example.pool" }
+```
+
+The Play app opens without the browser's bar once the website vouches for it: save the
+`assetlinks.json` file Bubblewrap describes (your package name and the SHA-256 fingerprint of the
+Play app signing key, from Play Console, App integrity) as
+`/home/crypto-data/yiimp/site/web/.well-known/assetlinks.json`.
 
 ### HTTPS later, with Let's Encrypt
 
