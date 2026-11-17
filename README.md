@@ -7,7 +7,8 @@ changes ([debitmydata-yiimp](https://github.com/DebitMyData-PoW/debitmydata-yiim
 
 - PPLNS paid in the block itself, and solo mining (password `m=solo`), on the DMD stratum port
 - My wallet, with notifications on the phone or the computer, and the installable pool app
-- The website on nginx with HTTPS from Let's Encrypt, the admin portal behind a password
+- The website on nginx with HTTPS, behind Cloudflare (or with Let's Encrypt), the admin portal
+  behind a password
 - MariaDB, memcached, the firewall, and the jobs that start with the server
 
 ## What you need
@@ -15,10 +16,31 @@ changes ([debitmydata-yiimp](https://github.com/DebitMyData-PoW/debitmydata-yiim
 - A **fresh Ubuntu 24.04** server (x86_64). 4 GB of memory or more is best; 1 GB is the minimum.
 - Root access with an SSH key.
 - Two names pointing to the server's IP (DNS A records):
-  - the website, like `pool.example.com`;
-  - the stratum, like `stratum.example.com`. With Cloudflare, the stratum's name must be
-    **DNS only** (the grey cloud): Cloudflare's proxy does not carry mining connections.
-- An email address, for Let's Encrypt.
+  - the website, like `pool.example.com`. With Cloudflare, it can be **proxied** (the orange
+    cloud) from the start: the server's IP stays hidden;
+  - the stratum, like `stratum.example.com`. It must be **DNS only** (the grey cloud):
+    Cloudflare's proxy does not carry mining connections.
+- For HTTPS, one of:
+  - **with Cloudflare** (recommended): a Cloudflare origin certificate (below);
+  - **without Cloudflare**: an email address for Let's Encrypt, and the website's name pointing
+    to the server directly.
+
+### The Cloudflare origin certificate
+
+Cloudflare makes it, for up to 15 years, and only Cloudflare trusts it: visitors see
+Cloudflare's own certificate, and Cloudflare checks this one on the way to the server. Make it
+just before the install, which asks you to paste it:
+
+1. In Cloudflare, open your domain, then **SSL/TLS**, **Origin Server**, **Create Certificate**.
+2. Keep "Generate private key and CSR with Cloudflare" (RSA) and the host names Cloudflare
+   suggests (your domain and `*.` your domain: they cover `pool.` your domain), choose
+   **15 years**, and create it.
+3. Keep the page open, in PEM format: the install asks for the **Origin Certificate**, then the
+   **Private Key**. Cloudflare shows the private key only once: also put it in your password
+   manager.
+4. In **SSL/TLS**, **Overview**, set the encryption mode to **Full (strict)**.
+
+The install keeps them in `/etc/ssl/cloudflare/` (the key readable only by root).
 
 ## Install
 
@@ -47,11 +69,11 @@ changes ([debitmydata-yiimp](https://github.com/DebitMyData-PoW/debitmydata-yiim
 | Question | Default | |
 | :-- | :-- | :-- |
 | Using sub-domain | | Yes for `pool.example.com`; no for `example.com` (then `www.example.com` too) |
-| Install SSL | | HTTPS from Let's Encrypt. The domain must already point to the server |
-| Cloudflare | | Yes if the website goes through Cloudflare's proxy: nginx then sees the visitors' real IPs |
+| Website and HTTPS | Cloudflare | **Through Cloudflare** (proxied): the Cloudflare origin certificate, nginx sees the visitors' real IPs, and only Cloudflare reaches ports 80 and 443. **Directly**: Let's Encrypt (DNS only). **HTTP only**: the server's IP, no domain |
 | Domain name | the server's IP | The website's name, without `www.` |
+| Cloudflare origin certificate | | With Cloudflare: the editor opens twice, for the certificate, then its private key (paste, Ctrl+O, Enter, Ctrl+X) |
 | Stratum URL | the domain name | What miners connect to |
-| Admin email | | Let's Encrypt's notices go to it |
+| Admin email | | Shown on the website; with Let's Encrypt, its notices go to it |
 | Your public IP | from your SSH connection | The IP of the computer you run the admin from |
 | DMD stratum port | 8700 | Miners connect to it; it is opened in the firewall |
 | Admin portal user | `pooladmin` | nginx asks for it on `/site/AdminPortal` |
@@ -87,7 +109,7 @@ the install user can read.
    Their keys are `configuration/push-vapid.pem` and `configuration/push.php`: back them up. A new
    key means every device turns notifications on again, so move both with the pool.
 
-### HTTPS later
+### HTTPS later, with Let's Encrypt
 
 If Let's Encrypt refused the certificate during the install (the domain did not point to the
 server yet), the website runs on HTTP. Once the domain points to it:
@@ -96,18 +118,34 @@ server yet), the website runs on HTTP. Once the domain points to it:
 bash ~/multipool/yiimp_single/https.sh
 ```
 
-With Cloudflare, set SSL/TLS to **Full (strict)**: Cloudflare then checks this certificate.
-
 ### Cloudflare's addresses
 
-With Cloudflare, `/etc/nginx/conf.d/cloudflare-real-ip.conf` lists Cloudflare's addresses, so
-that nginx takes the visitor's IP from them only. If Cloudflare changes its list
-(https://www.cloudflare.com/ips/), make the file again:
+With Cloudflare, only Cloudflare's addresses reach ports 80 and 443 (the firewall's rules
+marked `# Cloudflare`), and `/etc/nginx/conf.d/cloudflare-real-ip.conf` takes the visitor's IP
+from them only. Nobody can go around Cloudflare to the server's own IP. Cloudflare rarely
+changes its list (https://www.cloudflare.com/ips/); when it does, update both at once:
 
 ```
-{ for ip in $(curl -s https://www.cloudflare.com/ips-v4) $(curl -s https://www.cloudflare.com/ips-v6); do echo "set_real_ip_from $ip;"; done; echo "real_ip_header CF-Connecting-IP;"; } | sudo tee /etc/nginx/conf.d/cloudflare-real-ip.conf
-sudo nginx -t && sudo systemctl reload nginx
+bash ~/multipool/yiimp_single/cloudflare.sh
 ```
+
+It adds the new addresses before it removes the old ones, so the website is never cut off.
+
+### Looking at the database
+
+There is no phpMyAdmin on the server: the database holds every miner's balance, and a web page
+for it would be one more door in. From Windows, [HeidiSQL](https://www.heidisql.com/) (free)
+reaches it through SSH, with the key you already log in with:
+
+1. In HeidiSQL, **New** session. Network type: **MariaDB or MySQL (SSH tunnel)**.
+   Hostname `127.0.0.1`, user `panel`, port `3306`, and the password from
+   `/home/crypto-data/yiimp/.my.cnf` (`[clienthost1]`, `password=`).
+2. In the **SSH tunnel** tab: the SSH program (`plink.exe`, or `ssh.exe` with an OpenSSH key),
+   the server and its SSH port, your user name, your private key file, and a free local port
+   such as `3307`.
+3. **Open**, then the `yiimpfrontend` database.
+
+The database itself is never reachable from the internet: MariaDB only listens on the server.
 
 ## Where things are
 
@@ -123,6 +161,7 @@ sudo nginx -t && sudo systemctl reload nginx
 | `/home/crypto-data/wallets` | For the coin nodes' data |
 | `/etc/yiimp/keys.php` | The website's secrets |
 | `/etc/nginx/sites-available/<site>.conf`, `/etc/nginx/snippets/yiimp-site.conf` | The website's nginx config |
+| `/etc/ssl/cloudflare/<site>.pem`, `<site>.key` | The Cloudflare origin certificate and its key |
 
 ## Commands
 
@@ -132,7 +171,7 @@ sudo nginx -t && sudo systemctl reload nginx
 | `screen -r main` (or `loop2`, `blocks`, `debug`, `dmd`) | Look at a screen; Ctrl+A then D to leave it |
 | `screens start\|stop\|restart main\|loop2\|blocks\|debug` | Start, stop or restart a job |
 | `yiimp` | YiiMP's own commands |
-| `sudo ufw allow <port>` | Open another stratum port (only SSH, HTTP, HTTPS and the DMD port are open) |
+| `sudo ufw allow <port>` | Open another stratum port. Open after the install: SSH, the DMD port, and HTTP and HTTPS (from Cloudflare only, behind Cloudflare) |
 
 ## Security
 
