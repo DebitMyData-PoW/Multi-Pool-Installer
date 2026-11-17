@@ -209,7 +209,7 @@ The installer comes in three repositories, each downloaded by the one before:
 
 Each one's `master` branch is used. To try another branch or tag: `SETUP_REF=<ref>` before
 `bash` in step 1, `SINGLE_REF=<ref> multipool` for the install, and `YIIMP_REF=<ref> multipool`
-for the pool's code (the `ubuntu-24.04` branch of debitmydata-yiimp by default).
+for the pool's code (the `main` branch of debitmydata-yiimp by default).
 
 ## Credits
 
