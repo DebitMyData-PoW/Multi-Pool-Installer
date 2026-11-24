@@ -86,8 +86,23 @@ the install user can read.
 
 ## After the install
 
-1. **The DMD node.** Build DMD Core on the server (the installer has installed what it needs:
-   CMake and the libraries) and run it with RPC on 127.0.0.1 only.
+1. **The DebitMyData node.** Install DebitMyData Core from its GitHub release and check it: the
+   SHA-256 that `sha256sum` prints must be the one published with the download on
+   [debitmydata.io](https://debitmydata.io) (for a newer version, change `1.3.5` everywhere below):
+
+   ```
+   cd /tmp
+   curl -LO https://github.com/DebitMyData-PoW/DebitMyData-PoW-Core/releases/download/v1.3.5/debitmydata-1.3.5-x86_64-linux-gnu.tar.gz
+   sha256sum debitmydata-1.3.5-x86_64-linux-gnu.tar.gz
+   tar -xzf debitmydata-1.3.5-x86_64-linux-gnu.tar.gz
+   sudo install -m 755 debitmydata-1.3.5-x86_64-linux-gnu/debitmydatad debitmydata-1.3.5-x86_64-linux-gnu/debitmydata-cli /usr/local/bin/
+   rm -rf debitmydata-1.3.5-x86_64-linux-gnu*
+   ```
+
+   Building it from [the source](https://github.com/DebitMyData-PoW/DebitMyData-PoW-Core) on the
+   server works too: the installer has installed what that needs (CMake and the libraries).
+   Run the node with RPC on 127.0.0.1 only, and its data in a folder under
+   `/home/crypto-data/wallets`.
 2. **The DMD coin**, in the admin portal (`https://<your site>/site/AdminPortal`): add DMD,
    algorithm sha256, with the node's RPC port, user and password. In its settings:
    - Dedicated port: the DMD stratum port (8700);
@@ -161,6 +176,13 @@ reaches it through SSH, with the key you already log in with:
    the server and its SSH port, your user name, your private key file, and a free local port
    such as `3307`.
 3. **Open**, then the `yiimpfrontend` database.
+
+From macOS or Linux, open the same tunnel with SSH, then point any MySQL client (DBeaver,
+MySQL Workbench or `mysql`) at host `127.0.0.1`, port `3307`, user `panel`:
+
+```
+ssh -N -L 3307:127.0.0.1:3306 -p <SSH port> <user>@<server>
+```
 
 The database itself is never reachable from the internet: MariaDB only listens on the server.
 
